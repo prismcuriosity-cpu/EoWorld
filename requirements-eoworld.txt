@@ -1,0 +1,8 @@
+# EoWorld extra dependencies (on top of EoMT's own requirements.txt).
+# matplotlib / numpy / pillow / pyyaml already come in transitively via EoMT,
+# but are pinned loosely here so the viz + tooling scripts work standalone too.
+kagglehub>=0.3.0        # scripts/01_download_data.py
+matplotlib>=3.8         # figures
+numpy>=1.26
+pillow>=10.0
+pyyaml>=6.0             # config parsing in query-token extraction
