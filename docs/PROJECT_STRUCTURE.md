@@ -21,6 +21,9 @@ EoWorld/
 │   │   └── dataset_report.py         # stats collector + all fig_* functions
 │   ├── query_tokens/
 │   │   └── extract.py                # build EoMT, hook query tokens → z_t cache
+│   ├── video/                        # VidEoMT (Detectron2) integration
+│   │   ├── vspw.py                   # CholecSeg8k → VSPW converter + VSS metadata
+│   │   └── register_cholec_vss.py    # Detectron2 dataset registration (13-class)
 │   └── utils/
 ├── scripts/
 │   ├── 00_setup.sh                   # clone EoMT + install deps
@@ -31,9 +34,19 @@ EoWorld/
 │   ├── 05_train_segmentation.sh      # fine-tune EoMT (wraps main.py fit)
 │   ├── 06_extract_query_tokens.py    # extract z_t from a fine-tuned model
 │   ├── compute_annealing.py          # recompute annealing steps if bs/epochs change
-│   └── download_checkpoints.py       # fetch EoMT pretrained weights (ungated)
+│   ├── download_checkpoints.py       # fetch EoMT pretrained weights (ungated)
+│   └── video/                        # VIDEO pipeline (VidEoMT, separate env)
+│       ├── 00_setup_videomt.sh       # clone VidEoMT + detectron2
+│       ├── 10_convert_cholecseg8k_to_vspw.py
+│       ├── train_videomt.py          # register dataset + launch VidEoMT training
+│       ├── 12_eval_miou.py           # offline VSS mIoU (13 classes)
+│       └── download_videomt_checkpoints.py
+├── configs/cholecseg8k/
+│   ├── semantic/                     # EoMT image configs (S/B/L)
+│   └── video_vss/                    # VidEoMT-L video config
 ├── docs/
 │   ├── PROJECT_STRUCTURE.md
+│   ├── RUNNING.md                    # ★ step-by-step run guide (both pipelines)
 │   ├── CHECKPOINTS.md
 │   └── ROADMAP.md
 ├── assets/preview/                   # committed example figures
@@ -61,6 +74,27 @@ EoMT is a PyTorch-Lightning CLI (`main.py fit -c <config>`). We integrate by:
    loads a fine-tuned checkpoint, and captures the final-layer query embeddings via
    a forward pre-hook on `class_head` (whose input *is* the query slice
    `backbone.norm(x)[:, :num_q, :]`).
+
+## How VidEoMT (video) integrates
+
+VidEoMT is Detectron2-based and consumes **VSPW**-format video-semantic data. We
+integrate without touching upstream:
+
+1. **Convert** — `eoworld/video/vspw.py` turns each CholecSeg8k 80-frame clip into
+   a VSPW "video" (`origin/*.png` + `mask/*.png`). Masks are **1-indexed**
+   (`train_id + 1`, `0` = ignore) to match VidEoMT's `_vspw_preprocess` and the
+   offline mIoU script, which both do `0→ignore, value−1`.
+2. **Register** — `eoworld/video/register_cholec_vss.py` registers
+   `cholecseg8k_vss_video_{train,val,test}` with 13-class metadata and an identity
+   `stuff_dataset_id_to_contiguous_id`.
+3. **Launch** — `scripts/video/train_videomt.py` imports that registration, then
+   hands off to VidEoMT's own `train_net_video.main` via Detectron2 `launch`, so
+   the upstream trainer/model/evaluator run unmodified.
+4. **Evaluate** — VidEoMT's `VSSEvaluator` dumps predictions; `scripts/video/12_eval_miou.py`
+   reuses upstream's `Evaluator` with `num_class=13` to compute mIoU/per-class IoU.
+
+The class names/colours come from the same `eoworld/data/class_info.py` table used
+by the image pipeline, so both pipelines share one legend.
 
 ## The watershed encoding (why `class_info.py` matters)
 
