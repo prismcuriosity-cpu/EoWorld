@@ -31,17 +31,29 @@ def main() -> None:
         sys.exit("No frames found — check the path and folder layout.")
 
     report = inspect_watershed_values(args.data_path, max_frames=args.max_frames)
+    frac = report["pixel_fraction"]
     print(f"\nChecked {report['n_frames_checked']} frames.")
-    print("Known watershed values -> class:")
+    print("Known watershed values -> class (share of pixels):")
     for v, name in report["known_values"].items():
-        print(f"  {v:>3} -> {name}")
+        print(f"  {v:>3} -> {name:<22} {frac[v] * 100:6.2f}%")
+
+    if report["ignore_values"]:
+        print("\nExpected unlabeled/void values (mapped to ignore, harmless):")
+        for v in report["ignore_values"]:
+            print(f"  {v:>3} -> IGNORE            {frac[v] * 100:6.2f}%")
 
     if report["unknown_values"]:
-        print("\n!! UNKNOWN watershed values (not in class_info):")
-        print("  ", report["unknown_values"])
-        print("  Update CHOLECSEG8K_CLASSES in eoworld/data/class_info.py.")
+        print("\n!! UNKNOWN watershed values (neither a class nor expected ignore):")
+        for v in report["unknown_values"]:
+            print(f"  {v:>3}  {frac[v] * 100:6.2f}% of pixels")
+        print("  If one carries a large share, it may be a real class missing from")
+        print("  CHOLECSEG8K_CLASSES in eoworld/data/class_info.py; if tiny, add it")
+        print("  to IGNORE_WATERSHED_VALUES there.")
         sys.exit(1)
-    print("\nAll watershed values are known. Encoding verified ✓")
+
+    n_classes_seen = len(report["known_values"])
+    print(f"\nAll watershed values accounted for ({n_classes_seen} classes present, "
+          f"unlabeled handled). Encoding verified ✓")
 
 
 if __name__ == "__main__":

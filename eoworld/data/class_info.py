@@ -88,6 +88,14 @@ def _build_watershed_lut() -> np.ndarray:
 
 WATERSHED_TO_TRAIN = _build_watershed_lut()
 
+# Watershed pixel values that are EXPECTED to appear but are not classes: they mark
+# unlabeled / void regions and are mapped to IGNORE_INDEX. In the real CholecSeg8k
+# masks these are 0 (stray unlabeled) and 255 (ignore). They are a normal part of
+# the data — the black endoscopic border is the real "Black Background" class
+# (watershed 50), not these. Listed here so the mask inspector can tell an
+# expected-ignore value apart from a genuinely unexpected one.
+IGNORE_WATERSHED_VALUES = {0, 255}
+
 
 def watershed_to_train_ids(mask: np.ndarray) -> np.ndarray:
     """Map a watershed mask (H, W) or (H, W, 3) to a (H, W) train-id map.
