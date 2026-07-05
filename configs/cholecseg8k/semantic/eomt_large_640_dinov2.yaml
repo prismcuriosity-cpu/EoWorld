@@ -1,0 +1,47 @@
+# EoWorld · EoMT-L (DINOv2) · CholecSeg8k semantic segmentation (13 classes)
+# ---------------------------------------------------------------------------
+# Primary accuracy-oriented backbone for the full-scope plan (§11.2). Matches the
+# original EoMT paper's headline setting. DINOv2 weights are NOT gated.
+#
+# Memory note: EoMT-L @ 640 uses ~26 GB at batch_size 4. batch_size 4 fits a
+# 32 GB RTX 5090. If you hit OOM, drop to batch_size 2 (and re-run
+# scripts/compute_annealing.py for the new step count).
+#
+# Run:
+#   PYTHONPATH=/path/to/EoWorld python main.py fit \
+#     -c /path/to/EoWorld/configs/cholecseg8k/semantic/eomt_large_640_dinov2.yaml \
+#     --data.path /path/to/cholecseg8k \
+#     --model.ckpt_path /path/to/coco_panoptic_eomt_large_640/pytorch_model.bin \
+#     --model.load_ckpt_class_head False
+#
+# Annealing steps assume 5,650 train frames · batch_size 4 · 30 epochs
+# (steps/epoch 1413, total 42,390).
+trainer:
+  max_epochs: 30
+  devices: 1
+  logger:
+    class_path: lightning.pytorch.loggers.wandb.WandbLogger
+    init_args:
+      resume: allow
+      project: "eoworld"
+      name: "cholecseg8k_semantic_eomt_large_640_dinov2"
+model:
+  class_path: training.mask_classification_semantic.MaskClassificationSemantic
+  init_args:
+    attn_mask_annealing_enabled: True
+    attn_mask_annealing_start_steps: [0, 13692, 20517, 27342]
+    attn_mask_annealing_end_steps: [6274, 20517, 27342, 34166]
+    network:
+      class_path: models.eomt.EoMT
+      init_args:
+        num_q: 100
+        encoder:
+          class_path: models.vit.ViT
+          init_args:
+            backbone_name: vit_large_patch14_reg4_dinov2
+data:
+  class_path: eoworld.data.cholecseg8k.CholecSeg8kSemantic
+  init_args:
+    img_size: [640, 640]
+    batch_size: 4
+    num_workers: 8

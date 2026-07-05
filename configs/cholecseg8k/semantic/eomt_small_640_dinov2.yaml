@@ -1,0 +1,44 @@
+# EoWorld · EoMT-S (DINOv2) · CholecSeg8k semantic segmentation (13 classes)
+# ---------------------------------------------------------------------------
+# Fastest backbone — first choice for the runtime-feasibility experiment (§8.5)
+# and the quick smoke test. DINOv2 weights are NOT gated (no Meta access needed).
+#
+# Run from inside the eomt clone with the EoWorld repo on PYTHONPATH:
+#   PYTHONPATH=/path/to/EoWorld python main.py fit \
+#     -c /path/to/EoWorld/configs/cholecseg8k/semantic/eomt_small_640_dinov2.yaml \
+#     --data.path /path/to/cholecseg8k \
+#     --model.ckpt_path /path/to/coco_panoptic_eomt_small_640_2x/pytorch_model.bin \
+#     --model.load_ckpt_class_head False
+#
+# Annealing steps assume 5,650 train frames · batch_size 8 · 40 epochs
+# (steps/epoch 707, total 28,280). Changed any of these? Re-run
+# scripts/compute_annealing.py and paste the new lists below.
+trainer:
+  max_epochs: 40
+  devices: 1
+  logger:
+    class_path: lightning.pytorch.loggers.wandb.WandbLogger
+    init_args:
+      resume: allow
+      project: "eoworld"
+      name: "cholecseg8k_semantic_eomt_small_640_dinov2"
+model:
+  class_path: training.mask_classification_semantic.MaskClassificationSemantic
+  init_args:
+    attn_mask_annealing_enabled: True
+    attn_mask_annealing_start_steps: [0, 9134, 13688, 18241]
+    attn_mask_annealing_end_steps: [4185, 13688, 18241, 22794]
+    network:
+      class_path: models.eomt.EoMT
+      init_args:
+        num_q: 100
+        encoder:
+          class_path: models.vit.ViT
+          init_args:
+            backbone_name: vit_small_patch14_reg4_dinov2
+data:
+  class_path: eoworld.data.cholecseg8k.CholecSeg8kSemantic
+  init_args:
+    img_size: [640, 640]
+    batch_size: 8
+    num_workers: 8

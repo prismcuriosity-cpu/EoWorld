@@ -1,0 +1,23 @@
+# Upstream code, cloned by scripts/00_setup.sh
+third_party/
+
+# Data, weights, caches, runs
+checkpoints/
+cache/
+runs/
+wandb/
+*.ckpt
+*.bin
+*.npz
+*.pkl
+
+# Generated figures (working dir). Curated previews live in assets/preview/.
+figures/
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store
