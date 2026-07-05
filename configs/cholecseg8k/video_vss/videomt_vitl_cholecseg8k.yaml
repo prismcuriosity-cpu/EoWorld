@@ -1,0 +1,68 @@
+# EoWorld · VidEoMT-L (DINOv2) · CholecSeg8k video semantic segmentation (13 classes)
+# ---------------------------------------------------------------------------
+# Detectron2 config. Extends VidEoMT's VSPW ViT-L config and overrides only what
+# CholecSeg8k / a single 32 GB GPU needs. _BASE_ is resolved relative to THIS
+# file, and assumes VidEoMT was cloned to  <EoWorld>/third_party/videomt  by
+# scripts/video/00_setup_videomt.sh.
+#
+# Run via the wrapper (registers the cholec dataset, then launches training):
+#   export DETECTRON2_DATASETS=/parent/of/CholecSeg8k_VSPW
+#   python scripts/video/train_videomt.py \
+#     --num-gpus 1 \
+#     --config-file configs/cholecseg8k/video_vss/videomt_vitl_cholecseg8k.yaml \
+#     MODEL.WEIGHTS checkpoints/videomt/vspw_segmenter.pth \
+#     OUTPUT_DIR output/videomt_vitl_cholecseg8k
+_BASE_: ../../../third_party/videomt/configs/VSPW/videomt/dinov2/vit-large/videomt_online_ViTL.yaml
+
+MODEL:
+  # Init from a VidEoMT segmenter checkpoint (Init/Segmenter Weights column of the
+  # DINOv2 model zoo). The 124-class VSPW head won't load into our 13-class head
+  # (shape mismatch) — that's expected; it is re-initialised for fine-tuning.
+  WEIGHTS: "checkpoints/videomt/vspw_segmenter.pth"
+  BACKBONE:
+    NUM_CLASSES: 13
+    # 4-stage attention-mask annealing, rescaled to MAX_ITER = 20000
+    # (fractions 0.2/0.4/0.6/0.8 -> 0.4/0.6/0.8/1.0 of total steps).
+    ATTN_MASK_ANNEALING_ENABLED: True
+    START_STEPS: [4000, 8000, 12000, 16000]
+    END_STEPS: [8000, 12000, 16000, 20000]
+    TEST:
+      TASK: 'vss'
+      WINDOW_SIZE: 1
+
+DATASETS:
+  DATASET_RATIO: [1.0, ]
+  DATASET_NEED_MAP: [False, ]
+  DATASET_TYPE: ['video_semantic', ]
+  DATASET_TYPE_TEST: ['video_semantic', ]
+  TRAIN: ("cholecseg8k_vss_video_train",)
+  TEST: ("cholecseg8k_vss_video_val",)
+
+# Single 32 GB GPU. Lighter than VSPW's 8×5-frame setup:
+#  - 2 clips/iter, 3 contiguous frames/clip, capped short-side.
+# If you OOM: drop IMS_PER_BATCH to 1, SAMPLING_FRAME_NUM to 2, or the sizes.
+SOLVER:
+  IMS_PER_BATCH: 2
+  BASE_LR: 0.0001
+  STEPS: (14000,)
+  MAX_ITER: 20000
+  CHECKPOINT_PERIOD: 2000
+
+INPUT:
+  SAMPLING_FRAME_NUM: 3
+  SAMPLING_FRAME_RANGE: 1
+  MIN_SIZE_TRAIN: (320, 352, 384, 416, 448, 480)
+  MIN_SIZE_TEST: 480
+  MIN_SIZE_TRAIN_SAMPLING: "choice"
+  FORMAT: "RGB"
+  CROP:
+    ENABLED: False
+
+TEST:
+  EVAL_PERIOD: 0        # VSS metrics are computed offline (see run guide)
+
+DATALOADER:
+  NUM_WORKERS: 4
+  FILTER_EMPTY_ANNOTATIONS: False
+
+OUTPUT_DIR: './output/videomt_vitl_cholecseg8k'

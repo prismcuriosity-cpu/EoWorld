@@ -1,0 +1,1 @@
+"""EoWorld video (VidEoMT) integration."""

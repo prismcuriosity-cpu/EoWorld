@@ -12,6 +12,10 @@ the proposal builds on the query-token sequences produced by
 - [x] EoMT-S/B/L fine-tuning configs (Exp. 8.1 — segmentation fidelity)
 - [x] Query-token state extraction (the world-model latent z_t)
 - [x] Quick-setup smoke gate + ungated checkpoints
+- [x] **VidEoMT (temporal perception)** integration — CholecSeg8k→VSPW converter,
+      Detectron2 registration, ViT-L VSS config, train/eval wrappers. Enables the
+      single-frame-EoMT vs temporal-VidEoMT ablation (§9) and the VidEoMT
+      perception branch of §4.1.
 
 ### Next
 - [ ] **Latent dynamics model (Exp. 8.2).** Small causal-Transformer / GRU over

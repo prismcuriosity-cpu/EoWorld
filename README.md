@@ -7,23 +7,33 @@ builds on [**tue-mps/eomt**](https://github.com/tue-mps/eomt) (the Encoder-only
 Mask Transformer) and targets the [**CholecSeg8k**](https://www.kaggle.com/datasets/newslab/cholecseg8k)
 laparoscopic-cholecystectomy dataset.
 
-This first drop covers the fast-track **Week 1** scope of the proposal (§11.1):
+There are **two perception pipelines**, matching the proposal (§4.1) — image-level
+(EoMT) and temporal (VidEoMT):
 
 | Proposal item | What's here |
 |---|---|
 | Download & standardise CholecSeg8k | `eoworld/data/`, `scripts/01–02` |
 | Dataset understanding + **journal-ready figures** | `eoworld/viz/`, `scripts/03` |
-| EoMT fine-tuning pipeline (Exp. 8.1) | `configs/`, `scripts/05` |
+| **Image** perception — EoMT fine-tuning (Exp. 8.1) | `configs/cholecseg8k/semantic/`, `scripts/05` |
 | **Query-token extraction** (the world-model state z_t) | `eoworld/query_tokens/`, `scripts/06` |
+| **Video** perception — VidEoMT (temporal, VSS) | `eoworld/video/`, `configs/cholecseg8k/video_vss/`, `scripts/video/` |
 | Quick setup / smoke gate before the full run | `scripts/00`, `scripts/04` |
 
-The latent-dynamics model (Exp. 8.2), planning head (8.3) and uncertainty head
-(8.4) build directly on the extracted query-token sequences and are the next step
-— see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+👉 **Exact commands, expected output, and per-step troubleshooting for BOTH
+pipelines:** [`docs/RUNNING.md`](docs/RUNNING.md).
 
-> EoMT itself is **not** vendored here; `scripts/00_setup.sh` clones it into
-> `third_party/eomt` so it stays pristine and updatable. Our data module, configs
-> and tools plug into it without modifying upstream.
+The latent-dynamics model (Exp. 8.2), planning head (8.3) and uncertainty head
+(8.4) build directly on the extracted query-token sequences — see
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+> Neither EoMT nor VidEoMT is vendored here. `scripts/00_setup.sh` clones EoMT to
+> `third_party/eomt`; `scripts/video/00_setup_videomt.sh` clones VidEoMT to
+> `third_party/videomt`. Our data modules, configs and tools plug into them
+> without modifying upstream.
+>
+> ⚠️ The two use **incompatible stacks** (EoMT = PyTorch Lightning, VidEoMT =
+> Detectron2), so each needs its **own conda env** (`eoworld` and `videomt`).
+> `docs/RUNNING.md` spells this out.
 
 ---
 
@@ -84,6 +94,23 @@ python scripts/06_extract_query_tokens.py \
   --ckpt runs/<run>/checkpoints/last.ckpt --data-path <root> \
   --out cache/query_tokens_small
 ```
+
+## Video pipeline (VidEoMT) — separate `videomt` env
+
+```bash
+conda create -n videomt python=3.12.3 -y && conda activate videomt
+pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu126
+bash scripts/video/00_setup_videomt.sh                       # clone VidEoMT + detectron2
+export DETECTRON2_DATASETS=$HOME/datasets
+python scripts/video/10_convert_cholecseg8k_to_vspw.py \
+  --data-path <root> --out $DETECTRON2_DATASETS/CholecSeg8k_VSPW   # → VSPW format
+python scripts/video/download_videomt_checkpoints.py --which vspw_segmenter
+python scripts/video/train_videomt.py --num-gpus 1 \
+  --config-file configs/cholecseg8k/video_vss/videomt_vitl_cholecseg8k.yaml \
+  MODEL.WEIGHTS checkpoints/videomt/vspw_segmenter.pth
+```
+
+Full details incl. evaluation/mIoU and troubleshooting: [`docs/RUNNING.md`](docs/RUNNING.md).
 
 ## Backbones & checkpoints
 
