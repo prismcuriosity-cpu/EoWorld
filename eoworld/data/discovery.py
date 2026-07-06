@@ -61,26 +61,35 @@ def make_video_splits(
 
 
 def inspect_watershed_values(root: Union[str, Path], max_frames: int = 200) -> dict:
-    """Report the unique watershed pixel values present and flag any unknown one.
+    """Report the unique watershed pixel values present and classify each one.
 
     Run once after download to verify the canonical encoding in ``class_info``
-    matches this copy of the dataset.
+    matches this copy of the dataset. Values are split into three buckets:
+
+    * ``known_values``   — a real class (in CHOLECSEG8K_CLASSES)
+    * ``ignore_values``  — expected unlabeled/void (IGNORE_WATERSHED_VALUES),
+                           mapped to IGNORE_INDEX; harmless
+    * ``unknown_values`` — neither: a genuine encoding mismatch to investigate
     """
-    from eoworld.data.class_info import CHOLECSEG8K_CLASSES
+    from eoworld.data.class_info import CHOLECSEG8K_CLASSES, IGNORE_WATERSHED_VALUES
 
     known = {c.watershed_id: c.name for c in CHOLECSEG8K_CLASSES}
+    samples = find_samples(root)[:max_frames]
     seen: dict[int, int] = {}
-    for _, ws_path, _ in find_samples(root)[:max_frames]:
+    for _, ws_path, _ in samples:
         arr = np.asarray(Image.open(ws_path))
         if arr.ndim == 3:
             arr = arr[..., 0]
         vals, counts = np.unique(arr, return_counts=True)
         for v, ct in zip(vals.tolist(), counts.tolist()):
             seen[v] = seen.get(v, 0) + int(ct)
-    unknown = sorted(v for v in seen if v not in known)
+    total = sum(seen.values()) or 1
+    unknown = sorted(v for v in seen if v not in known and v not in IGNORE_WATERSHED_VALUES)
     return {
-        "n_frames_checked": len(find_samples(root)[:max_frames]),
+        "n_frames_checked": len(samples),
         "known_values": {v: known[v] for v in sorted(seen) if v in known},
+        "ignore_values": sorted(v for v in seen if v in IGNORE_WATERSHED_VALUES),
         "unknown_values": unknown,
         "pixel_counts": dict(sorted(seen.items())),
+        "pixel_fraction": {v: seen[v] / total for v in sorted(seen)},
     }
